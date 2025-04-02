@@ -8,7 +8,7 @@ require (
 	github.com/getkin/kin-openapi v0.129.0
 	github.com/gin-contrib/pprof v1.5.2
 	github.com/gin-gonic/gin v1.10.0
-	github.com/ihezebin/openapi v1.0.5
+	github.com/ihezebin/openapi v1.0.6
 	github.com/ihezebin/soup v0.0.0-20250224103227-eb9a05359431
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.21.0
