@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/ihezebin/soup/logger"
+	"github.com/ihezebin/olympus/logger"
 )
 
 const maxBodyLen = 1024

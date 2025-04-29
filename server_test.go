@@ -2,14 +2,14 @@ package httpserver
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gin-gonic/gin"
 	"github.com/ihezebin/openapi"
+	"go.opentelemetry.io/otel/trace"
 
-	"github.com/ihezebin/httpserver/middleware"
+	"github.com/ihezebin/olympus/httpserver/middleware"
+	"github.com/ihezebin/olympus/logger"
 )
 
 var ctx = context.Background()
@@ -18,23 +18,7 @@ func TestServer(t *testing.T) {
 	server := NewServer(
 		WithPort(8000),
 		WithServiceName("test_server"),
-		WithMiddlewares(
-			middleware.Recovery(),
-			middleware.LoggingRequestWithoutHeader(),
-			middleware.LoggingResponseWithoutHeader(),
-		),
-		WithOpenAPInfo(openapi3.Info{
-			Version:     "1.0",
-			Description: "这是一个使用 Gin 和 OpenAPI 生成 API 文档的示例。",
-			Contact: &openapi3.Contact{
-				Name:  "ihezebin",
-				Email: "ihezebin@gmail.com",
-			},
-		}),
-		WithOpenAPIServer(openapi3.Server{
-			URL:         fmt.Sprintf("http://localhost:%d", 8000),
-			Description: "本地开发环境",
-		}),
+		WithMiddlewares(middleware.LoggingRequestWithoutHeader(), middleware.LoggingResponse()),
 	)
 
 	server.RegisterRoutes(&HelloRouter{})
@@ -55,6 +39,34 @@ func TestServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	if err := server.RunWithNotifySignal(ctx); err != nil {
+		t.Fatal(err)
+	}
+}
+
+/*
+curl --location 'http://127.0.0.1:8000/hello/ping' \
+--header 'Traceparent: 00-5e64f77760384d153783c96049550881-b7ad6b7169203331-01'
+
+这个 Traceparent 的格式：
+00-5e64f77760384d153783c96049550881-b7ad6b7169203331-01
+00-traceId-spanId-flags
+
+traceId: 5e64f77760384d153783c96049550881
+spanId: b7ad6b7169203331
+flags: 01
+
+相关文档：https://opentelemetry.io/docs/specs/otel/context/api-propagators/#w3c-trace-context-requirements
+*/
+func TestServerWithOtel(t *testing.T) {
+	server := NewServer(
+		WithPort(8000),
+		WithServiceName("test_server"),
+		WithOtel(true),
+	)
+
+	server.RegisterRoutes(&HelloRouter{})
 
 	if err := server.RunWithNotifySignal(ctx); err != nil {
 		t.Fatal(err)
@@ -87,6 +99,10 @@ func (h *HelloRouter) Hello(c *gin.Context, req *HelloReq) (resp *HelloResp, err
 }
 
 func (h *HelloRouter) Ping(c *gin.Context, req map[string]interface{}) (resp string, err error) {
-	fmt.Println(req)
-	return "pong", nil
+	ctx := c.Request.Context()
+
+	traceId := trace.SpanContextFromContext(ctx).TraceID().String()
+
+	logger.Infof(ctx, "traceId: %s, req: %+v", traceId, req)
+	return "pong!" + traceId, nil
 }

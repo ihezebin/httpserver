@@ -82,7 +82,7 @@ func (r *rapidocBuilder) HTML(doc string, title string) string {
     <title>{:title}</title>
     <script
       type="module"
-      src="http://unpkg.com/rapidoc/dist/rapidoc-min.js"
+      src="http://unpkg.com/rapidoc@9.3.8/dist/rapidoc-min.js"
     ></script>
   </head>
   <style>

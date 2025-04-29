@@ -12,18 +12,23 @@ import (
 
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
+	"github.com/ihezebin/olympus/logger"
 	"github.com/ihezebin/openapi"
-	"github.com/ihezebin/soup/logger"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/ihezebin/httpserver/internal"
 )
 
 type server struct {
 	*http.Server
-	options *ServerOptions
-	engine  *gin.Engine
-	openapi *openapi.API
+	options   *ServerOptions
+	engine    *gin.Engine
+	openapi   *openapi.API
+	shutdowns []ShutdownFunc
 }
+
+type ShutdownFunc func(context.Context) error
 
 func NewServer(opts ...ServerOption) *server {
 	serverOptions := mergeServerOptions(opts...)
@@ -38,8 +43,15 @@ func NewServer(opts ...ServerOption) *server {
 	// 中间件
 	engine.Use(serverOptions.Middlewares...)
 
+	shutdowns := make([]ShutdownFunc, 0)
+	if serverOptions.Otel {
+		shutdowns = append(shutdowns, serverOptions.OtelInit()...)
+		engine.Use(internal.OtelExtractTrace(serverOptions.ServiceName))
+		engine.Use(internal.OtelInjectTrace())
+	}
+
 	// 设置服务名称
-	serviceName := "httpserver"
+	serviceName := "olympus httpserver"
 	if serverOptions.ServiceName != "" {
 		serviceName = serverOptions.ServiceName
 	}
@@ -71,14 +83,19 @@ func NewServer(opts ...ServerOption) *server {
 	openApi := openapi.NewAPI(serviceName, openapiOpts...)
 	openApi.RegisterModel(openapi.ModelOf[Body[any]]())
 
+	kernel := &http.Server{
+		Handler: engine,
+		Addr:    fmt.Sprintf(":%d", serverOptions.Port),
+	}
+
+	shutdowns = append(shutdowns, kernel.Shutdown)
+
 	server := &server{
-		Server: &http.Server{
-			Handler: engine,
-			Addr:    fmt.Sprintf(":%d", serverOptions.Port),
-		},
-		options: serverOptions,
-		engine:  engine,
-		openapi: openApi,
+		Server:    kernel,
+		options:   serverOptions,
+		engine:    engine,
+		openapi:   openApi,
+		shutdowns: shutdowns,
 	}
 
 	return server
@@ -96,11 +113,11 @@ func (s *server) OpenAPI() *openapi.API {
 	return s.openapi
 }
 
-type Routes interface {
+type RegisterRoutes interface {
 	RegisterRoutes(router Router)
 }
 
-func (s *server) RegisterRoutes(routers ...Routes) {
+func (s *server) RegisterRoutes(routers ...RegisterRoutes) {
 	for _, router := range routers {
 		router.RegisterRoutes(&openapiRouter{
 			router:  s.engine,
@@ -167,5 +184,10 @@ func (s *server) RunWithNotifySignal(ctx context.Context) error {
 }
 
 func (s *server) Close(ctx context.Context) error {
-	return s.Shutdown(ctx)
+	for _, shutdown := range s.shutdowns {
+		if err := shutdown(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -5,7 +5,8 @@ import (
 	"runtime/debug"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ihezebin/soup/logger"
+
+	"github.com/ihezebin/olympus/logger"
 )
 
 func Recovery() gin.HandlerFunc {

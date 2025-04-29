@@ -10,7 +10,7 @@ import (
 	"github.com/ihezebin/openapi"
 	"github.com/pkg/errors"
 
-	"github.com/ihezebin/soup/logger"
+	"github.com/ihezebin/olympus/logger"
 )
 
 type Handler[RequestT any, ResponseT any] func(c *gin.Context, req RequestT) (resp ResponseT, err error)
