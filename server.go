@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
+	"github.com/ihezebin/olympus/logger"
 	"github.com/ihezebin/openapi"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -25,8 +26,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 
-	"github.com/ihezebin/olympus/httpserver/internal"
-	"github.com/ihezebin/olympus/logger"
+	"github.com/ihezebin/httpserver/internal"
 )
 
 type server struct {
