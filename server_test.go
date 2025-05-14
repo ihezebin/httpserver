@@ -15,15 +15,19 @@ import (
 var ctx = context.Background()
 
 func TestServer(t *testing.T) {
-	server := NewServer(
+	server, err := NewServer(
+		ctx,
 		WithPort(8000),
 		WithServiceName("test_server"),
 		WithMiddlewares(middleware.LoggingRequestWithoutHeader(), middleware.LoggingResponse()),
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	server.RegisterRoutes(&HelloRouter{})
 
-	err := server.RegisterOpenAPIUI("/stoplight", StoplightUI)
+	err = server.RegisterOpenAPIUI("/stoplight", StoplightUI)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,11 +64,14 @@ flags: 01
 相关文档：https://opentelemetry.io/docs/specs/otel/context/api-propagators/#w3c-trace-context-requirements
 */
 func TestServerWithOtel(t *testing.T) {
-	server := NewServer(
+	server, err := NewServer(
+		ctx,
 		WithPort(8000),
 		WithServiceName("test_server"),
-		WithOtel(true),
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	server.RegisterRoutes(&HelloRouter{})
 

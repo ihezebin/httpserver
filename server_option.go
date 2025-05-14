@@ -3,39 +3,31 @@ package httpserver
 import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gin-gonic/gin"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/trace"
 )
 
 type ServerOptions struct {
-	Port            uint                  `json:"port" yaml:"port" toml:"port"`
-	Daemon          bool                  `json:"daemon" yaml:"daemon" toml:"daemon"`
-	Middlewares     []gin.HandlerFunc     `json:"middlewares" yaml:"middlewares" toml:"middlewares"`
-	ServiceName     string                `json:"service_name" yaml:"service_name" toml:"service_name"`
-	HiddenRoutesLog bool                  `json:"hidden_routes_log" yaml:"hidden_routes_log" toml:"hidden_routes_log"`
-	Metrics         bool                  `json:"metrics" yaml:"metrics" toml:"metrics"`
-	Pprof           bool                  `json:"pprof" yaml:"pprof" toml:"pprof"`
-	OpenAPInfo      *openapi3.Info        `json:"openap_info" yaml:"openap_info" toml:"openap_info"`
-	OpenAPIServer   *openapi3.Server      `json:"openap_server" yaml:"openap_server" toml:"openap_server"`
-	Otel            bool                  `json:"otel_trace" yaml:"otel_trace" toml:"otel_trace"`
-	OtelInit        func() []ShutdownFunc `json:"otel_init" yaml:"otel_init" toml:"otel_init"`
+	Port            uint               `json:"port" yaml:"port" toml:"port"`
+	Daemon          bool               `json:"daemon" yaml:"daemon" toml:"daemon"`
+	Middlewares     []gin.HandlerFunc  `json:"middlewares" yaml:"middlewares" toml:"middlewares"`
+	ServiceName     string             `json:"service_name" yaml:"service_name" toml:"service_name"`
+	HiddenRoutesLog bool               `json:"hidden_routes_log" yaml:"hidden_routes_log" toml:"hidden_routes_log"`
+	Pprof           bool               `json:"pprof" yaml:"pprof" toml:"pprof"`
+	OpenAPInfo      *openapi3.Info     `json:"openap_info" yaml:"openap_info" toml:"openap_info"`
+	OpenAPIServers  []openapi3.Server  `json:"openap_server" yaml:"openap_server" toml:"openap_server"`
+	Metrics         bool               `json:"metrics" yaml:"metrics" toml:"metrics"`
+	TraceExporter   trace.SpanExporter `json:"trace_exporter" yaml:"trace_exporter" toml:"trace_exporter"`
+	LogProcessor    log.Processor      `json:"log_processor" yaml:"log_processor" toml:"log_processor"`
 }
 
 type ServerOption func(*ServerOptions)
 
 func mergeServerOptions(opts ...ServerOption) *ServerOptions {
 	opt := &ServerOptions{
-		Port: 8080,
-		Otel: true,
-		OtelInit: func() []ShutdownFunc {
-			tp := trace.NewTracerProvider()
-			otel.SetTracerProvider(tp)
-			propagator := propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})
-			otel.SetTextMapPropagator(propagator)
-			shutdowns := []ShutdownFunc{tp.Shutdown}
-			return shutdowns
-		},
+		Port:    8080,
+		Pprof:   true,
+		Metrics: true,
 	}
 	for _, o := range opts {
 		o(opt)
@@ -43,15 +35,31 @@ func mergeServerOptions(opts ...ServerOption) *ServerOptions {
 	return opt
 }
 
-func WithOtelInit(init func() []ShutdownFunc) ServerOption {
+// WithTraceExporter 设置 trace exporter
+// otlptracehttp.New(ctx,
+//
+//	otlptracehttp.WithInsecure(),
+//	otlptracehttp.WithEndpoint("localhost:54318"),
+//
+// )
+func WithTraceExporter(exporter trace.SpanExporter) ServerOption {
 	return func(o *ServerOptions) {
-		o.OtelInit = init
+		o.TraceExporter = exporter
 	}
 }
 
-func WithOtel(enabled bool) ServerOption {
+// WithMetrics 使用 prometheus 作为 metrics 的 provider reader
+func WithMetrics() ServerOption {
 	return func(o *ServerOptions) {
-		o.Otel = enabled
+		o.Metrics = true
+	}
+}
+
+// WithLogProcessor 设置 log processor
+// 日志需要实现通过 otellog.Logger Emit 日志内容
+func WithLogProcessor(exporter log.Exporter, opts ...log.BatchProcessorOption) ServerOption {
+	return func(o *ServerOptions) {
+		o.LogProcessor = log.NewBatchProcessor(exporter, opts...)
 	}
 }
 
@@ -70,12 +78,6 @@ func WithDaemon(daemon bool) ServerOption {
 func WithMiddlewares(middlewares ...gin.HandlerFunc) ServerOption {
 	return func(o *ServerOptions) {
 		o.Middlewares = middlewares
-	}
-}
-
-func WithMetrics() ServerOption {
-	return func(o *ServerOptions) {
-		o.Metrics = true
 	}
 }
 
@@ -107,8 +109,8 @@ func WithOpenAPInfo(info openapi3.Info) ServerOption {
 	}
 }
 
-func WithOpenAPIServer(server openapi3.Server) ServerOption {
+func WithOpenAPIServer(server ...openapi3.Server) ServerOption {
 	return func(o *ServerOptions) {
-		o.OpenAPIServer = &server
+		o.OpenAPIServers = append(o.OpenAPIServers, server...)
 	}
 }
