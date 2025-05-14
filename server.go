@@ -62,10 +62,6 @@ func NewServer(ctx context.Context, opts ...ServerOption) (*server, error) {
 		c.Set(ServiceNameKey, serviceName)
 		c.Next()
 	})
-	//默认的健康检查接口
-	engine.GET("/health", func(c *gin.Context) {
-		c.String(http.StatusOK, "ok")
-	})
 
 	// default true
 	if serverOptions.Pprof {
@@ -88,15 +84,19 @@ func NewServer(ctx context.Context, opts ...ServerOption) (*server, error) {
 		semconv.ServiceName(serviceName),
 	)
 	// https://www.hezebin.com/article/67d1556324efba7f96725c83
+	var tp *trace.TracerProvider
 	if serverOptions.TraceExporter != nil {
-		tp := trace.NewTracerProvider(
+		tp = trace.NewTracerProvider(
 			trace.WithBatcher(serverOptions.TraceExporter),
 			trace.WithResource(otelResource),
 		)
-
-		otel.SetTracerProvider(tp)
-		shutdowns = append(shutdowns, tp.Shutdown)
+	} else {
+		tp = trace.NewTracerProvider(
+			trace.WithResource(otelResource),
+		)
 	}
+	otel.SetTracerProvider(tp)
+	shutdowns = append(shutdowns, tp.Shutdown)
 
 	// default true
 	if serverOptions.Metrics {
@@ -131,6 +131,11 @@ func NewServer(ctx context.Context, opts ...ServerOption) (*server, error) {
 	}
 	openApi := openapi.NewAPI(serviceName, openapiOpts...)
 	openApi.RegisterModel(openapi.ModelOf[Body[any]]())
+
+	//默认的健康检查接口
+	engine.GET("/health", func(c *gin.Context) {
+		c.String(http.StatusOK, "ok")
+	})
 
 	kernel := &http.Server{
 		Handler: engine,

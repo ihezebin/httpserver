@@ -7,10 +7,12 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 )
 
+// OtelExtractTrace 提取 traceId
 func OtelExtractTrace(service string) gin.HandlerFunc {
 	return otelgin.Middleware(service)
 }
 
+// OtelInjectTrace 注入 traceId
 func OtelInjectTrace() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
