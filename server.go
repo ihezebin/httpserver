@@ -24,7 +24,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 
 	"github.com/ihezebin/httpserver/internal"
 )
@@ -175,9 +175,9 @@ type RegisterRoutes interface {
 func (s *server) RegisterRoutes(routers ...RegisterRoutes) {
 	for _, router := range routers {
 		router.RegisterRoutes(&openapiRouter{
-			router:  s.engine,
-			openapi: s.openapi,
-			prefix:  "",
+			ginRouter: s.engine,
+			openapi:   s.openapi,
+			prefix:    "",
 		})
 	}
 }

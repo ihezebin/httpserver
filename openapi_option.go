@@ -8,6 +8,12 @@ import (
 
 type OpenAPIOption func(*openapi.Route)
 
+type OpenAPIOptions []OpenAPIOption
+
+func NewOpenAPIOptions(opts ...OpenAPIOption) OpenAPIOptions {
+	return opts
+}
+
 func WithOpenAPIDescription(description string) OpenAPIOption {
 	return func(route *openapi.Route) {
 		route.HasDescription(description)
